@@ -1,0 +1,37 @@
+{
+  "scrapers": {
+    "amazon": {
+      "enabled": true,
+      "base_url": "https://www.amazon.in",
+      "search_url": "https://www.amazon.in/s?k="
+    },
+    "flipkart": {
+      "enabled": true,
+      "base_url": "https://www.flipkart.com",
+      "search_url": "https://www.flipkart.com/search?q="
+    },
+    "ebay": {
+      "enabled": true,
+      "base_url": "https://www.ebay.com",
+      "search_url": "https://www.ebay.com/sch/i.html?_nkw="
+    },
+    "croma": {
+      "enabled": true,
+      "base_url": "https://www.croma.com",
+      "search_url": "https://www.croma.com/search/?q="
+    }
+  },
+  "email": {
+    "enabled": false,
+    "smtp_server": "smtp.gmail.com",
+    "smtp_port": 587,
+    "sender_email": "",
+    "sender_password": ""
+  },
+  "settings": {
+    "headless": false,
+    "timeout": 30,
+    "max_results_per_site": 5,
+    "price_drop_threshold_percent": 10
+  }
+}

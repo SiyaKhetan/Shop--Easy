@@ -33,5 +33,17 @@
     "timeout": 30,
     "max_results_per_site": 5,
     "price_drop_threshold_percent": 10
+  },
+  "recommendation_system": {
+    "enabled": true,
+    "weights": {
+      "price": 0.35,
+      "rating": 0.25,
+      "reviews": 0.15,
+      "delivery_time": 0.15,
+      "return_policy": 0.10
+    },
+    "top_n_recommendations": 10,
+    "annotate_results": true
   }
 }

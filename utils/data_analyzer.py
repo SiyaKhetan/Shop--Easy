@@ -2,15 +2,17 @@
 Data analysis module using Pandas
 """
 import pandas as pd
-from typing import List, Dict
+from typing import List, Dict, Optional
 import logging
+from .recommendation_system import RecommendationSystem
 
 
 class DataAnalyzer:
     """Analyze and process product data"""
     
-    def __init__(self):
+    def __init__(self, recommendation_system: Optional[RecommendationSystem] = None):
         self.logger = logging.getLogger('ShopEasy')
+        self.recommendation_system = recommendation_system
     
     def create_dataframe(self, all_results: List[Dict]) -> pd.DataFrame:
         """Create pandas DataFrame from scraped results"""
@@ -106,7 +108,26 @@ class DataAnalyzer:
         """Sort products by price"""
         return df.sort_values('price', ascending=ascending)
     
-    def get_summary_report(self, df: pd.DataFrame) -> str:
+    def get_smart_recommendations(self, products: List[Dict], top_n: int = 10) -> List[Dict]:
+        """
+        Get smart recommendations using the recommendation system.
+        
+        Args:
+            products: List of product dictionaries
+            top_n: Number of recommendations to return
+            
+        Returns:
+            List of recommended products with scores and labels
+        """
+        if not self.recommendation_system:
+            self.logger.warning("Recommendation system not initialized, falling back to price-based sorting")
+            # Fallback to price-based sorting
+            valid_products = [p for p in products if p.get('price', 0) > 0]
+            return sorted(valid_products, key=lambda x: x.get('price', float('inf')))[:top_n]
+        
+        return self.recommendation_system.get_recommendations(products, top_n=top_n, annotate=True)
+    
+    def get_summary_report(self, df: pd.DataFrame, include_recommendations: bool = True) -> str:
         """Generate a text summary report"""
         if df.empty:
             return "No products found."
@@ -122,7 +143,7 @@ class DataAnalyzer:
         
         if analysis['cheapest']:
             cheapest = analysis['cheapest']
-            report.append(f"\n🏆 BEST DEAL:")
+            report.append(f"\n🏆 BEST DEAL (BY PRICE):")
             report.append(f"   Product: {cheapest['title'][:60]}...")
             report.append(f"   Price: ₹{cheapest['price']:.2f}")
             report.append(f"   Platform: {cheapest['platform']}")
@@ -134,9 +155,25 @@ class DataAnalyzer:
             report.append(f"   Price Range: ₹{analysis['price_range']['min']:.2f} - ₹{analysis['price_range']['max']:.2f}")
             report.append(f"   Price Difference: ₹{analysis['price_range']['difference']:.2f}")
         
-        report.append(f"\n📊 TOP 5 BEST DEALS:")
+        report.append(f"\n📊 TOP 5 BEST DEALS (BY PRICE):")
         for i, deal in enumerate(analysis['best_deals'][:5], 1):
             report.append(f"   {i}. {deal['platform']}: ₹{deal['price']:.2f} - {deal['title'][:50]}...")
+        
+        # Add smart recommendations if enabled
+        if include_recommendations and self.recommendation_system:
+            products_list = df.to_dict('records')
+            recommendations = self.get_smart_recommendations(products_list, top_n=10)
+            
+            if recommendations:
+                report.append(f"\n🤖 SMART RECOMMENDATIONS (BY OVERALL VALUE):")
+                report.append("   (Ranked by weighted score: price, rating, reviews, delivery, return policy)")
+                for i, rec in enumerate(recommendations[:10], 1):
+                    labels = rec.get('labels', [])
+                    label_str = f" [{', '.join(labels)}]" if labels else ""
+                    score = rec.get('final_score', 'N/A')
+                    rating = f" ⭐ {rec.get('rating', 'N/A')}" if rec.get('rating') else ""
+                    report.append(f"   {i}. {rec['platform']}: ₹{rec['price']:.2f}{rating} (Score: {score}){label_str}")
+                    report.append(f"      {rec['title'][:55]}...")
         
         report.append("\n" + "=" * 60)
         

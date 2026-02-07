@@ -9,6 +9,7 @@ from typing import List, Dict
 from utils.logger import setup_logger
 from utils.data_analyzer import DataAnalyzer
 from utils.email_notifier import EmailNotifier
+from utils.recommendation_system import RecommendationSystem
 from scrapers.amazon_scraper import AmazonScraper
 from scrapers.flipkart_scraper import FlipkartScraper
 from scrapers.ebay_scraper import EbayScraper
@@ -21,7 +22,16 @@ class ShopEasy:
     def __init__(self, config_path: str = 'config.json'):
         self.logger = setup_logger('ShopEasy')
         self.config = self.load_config(config_path)
-        self.data_analyzer = DataAnalyzer()
+        
+        # Initialize recommendation system if enabled
+        recommendation_system = None
+        rec_config = self.config.get('recommendation_system', {})
+        if rec_config.get('enabled', True):
+            weights = rec_config.get('weights', {})
+            recommendation_system = RecommendationSystem(weights=weights)
+            self.logger.info("✓ Smart Recommendation System initialized")
+        
+        self.data_analyzer = DataAnalyzer(recommendation_system=recommendation_system)
         self.email_notifier = EmailNotifier(
             smtp_server=self.config.get('email', {}).get('smtp_server'),
             smtp_port=self.config.get('email', {}).get('smtp_port'),

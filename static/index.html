@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ShopEasy – Compare Prices</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0f0f12;
+      --surface: #18181c;
+      --surface-hover: #1f1f24;
+      --border: #2a2a30;
+      --text: #e8e8ed;
+      --text-muted: #8b8b96;
+      --accent: #22c55e;
+      --accent-hover: #16a34a;
+      --danger: #ef4444;
+      --radius: 12px;
+      --shadow: 0 4px 24px rgba(0,0,0,0.4);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'DM Sans', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+
+    .container {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 2.5rem;
+    }
+
+    h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.25rem;
+    }
+
+    .tagline {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+
+    .search-box {
+      display: flex;
+      gap: 0.75rem;
+      margin-bottom: 2rem;
+    }
+
+    .search-box input {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.875rem 1rem;
+      font-family: inherit;
+      font-size: 1rem;
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .search-box input::placeholder {
+      color: var(--text-muted);
+    }
+
+    .search-box input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.15);
+    }
+
+    .search-box button {
+      background: var(--accent);
+      color: #0f0f12;
+      border: none;
+      border-radius: var(--radius);
+      padding: 0.875rem 1.5rem;
+      font-family: inherit;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+      white-space: nowrap;
+    }
+
+    .search-box button:hover:not(:disabled) {
+      background: var(--accent-hover);
+    }
+
+    .search-box button:active:not(:disabled) {
+      transform: scale(0.98);
+    }
+
+    .search-box button:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+    }
+
+    .search-box button#demoBtn {
+      background: var(--surface);
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+    }
+    .search-box button#demoBtn:hover:not(:disabled) {
+      background: var(--surface-hover);
+      color: var(--text);
+    }
+
+    .message {
+      text-align: center;
+      padding: 2rem;
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+
+    .message.error {
+      color: #f87171;
+    }
+
+    .loading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+      padding: 2.5rem;
+      color: var(--text-muted);
+    }
+
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .results-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+    }
+
+    .results-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem 1.25rem;
+      transition: background 0.2s, border-color 0.2s;
+      display: flex;
+      align-items: flex-start;
+      gap: 1rem;
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .card:hover {
+      background: var(--surface-hover);
+      border-color: var(--accent);
+    }
+
+    .rank {
+      flex-shrink: 0;
+      width: 32px;
+      height: 32px;
+      background: var(--border);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 500;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    .card:nth-child(1) .rank { background: rgba(34, 197, 94, 0.2); color: var(--accent); }
+    .card:nth-child(2) .rank { background: rgba(34, 197, 94, 0.15); color: #4ade80; }
+    .card:nth-child(3) .rank { background: rgba(34, 197, 94, 0.1); color: #86efac; }
+
+    .card-body {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .card-title {
+      font-weight: 600;
+      font-size: 0.95rem;
+      margin-bottom: 0.25rem;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .card-meta {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.5rem 1rem;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .platform {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.2rem 0.5rem;
+      background: var(--border);
+      border-radius: 6px;
+      font-weight: 500;
+      color: var(--text);
+    }
+
+    .card-price {
+      flex-shrink: 0;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 600;
+      font-size: 1.1rem;
+      color: var(--accent);
+    }
+
+    .card-price small {
+      font-weight: 400;
+      font-size: 0.75em;
+      color: var(--text-muted);
+    }
+
+    footer {
+      margin-top: 2.5rem;
+      text-align: center;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>ShopEasy</h1>
+      <p class="tagline">Compare prices across Amazon, Flipkart & Croma — best deals first</p>
+    </header>
+
+    <div class="search-box" id="searchForm">
+      <input
+        type="text"
+        id="query"
+        placeholder="e.g. wireless headphones, laptop stand"
+        autocomplete="off"
+      >
+      <button type="button" id="submitBtn">Search</button>
+      <button type="button" id="demoBtn">Try demo</button>
+    </div>
+    <p class="message" style="margin-top:-1rem;margin-bottom:1rem;font-size:0.85rem">
+      Use <strong>Try demo</strong> to see results in 1 second. Use <strong>Search</strong> for real scraping (3–6 min).
+    </p>
+
+    <div id="out">
+      <p class="message" id="initialMsg">Enter a product name and click Search. Results are sorted from lowest to highest price.</p>
+    </div>
+
+    <footer>
+      Results are scraped in real time. Real search may take 3–6 minutes — please wait.
+    </footer>
+  </div>
+
+  <script>
+    (function() {
+      'use strict';
+      var out, queryInput, submitBtn, demoBtn;
+
+      function init() {
+        out = document.getElementById('out');
+        queryInput = document.getElementById('query');
+        submitBtn = document.getElementById('submitBtn');
+        demoBtn = document.getElementById('demoBtn');
+        if (!out || !queryInput || !submitBtn) {
+          if (out) out.innerHTML = '<p class="message error">Page failed to load. Hard refresh: Ctrl+Shift+R</p>';
+          return;
+        }
+
+        // Check if server is reachable
+        fetch('/api/health', { method: 'GET' }).catch(function() {
+          var msg = document.getElementById('initialMsg');
+          if (msg) msg.innerHTML = '⚠️ Server not detected. Run <strong>python app.py</strong> and open <strong>http://localhost:5000</strong>';
+        });
+
+        function setLoading(loading) {
+          submitBtn.disabled = loading;
+          submitBtn.textContent = loading ? 'Searching…' : 'Search';
+          if (demoBtn) {
+            demoBtn.disabled = loading;
+            demoBtn.textContent = loading ? '…' : 'Try demo';
+          }
+        }
+
+        function showMessage(text, isError) {
+          isError = !!isError;
+          out.innerHTML = '<p class="message' + (isError ? ' error' : '') + '">' + escapeHtml(text) + '</p>';
+        }
+
+        function escapeHtml(s) {
+          var div = document.createElement('div');
+          div.textContent = s == null ? '' : String(s);
+          return div.innerHTML;
+        }
+
+        function formatPrice(price) {
+          if (price == null || Number.isNaN(Number(price))) return 'Price N/A';
+          var n = Number(price);
+          if (n <= 0) return 'Price N/A';
+          return '₹' + (n % 1 === 0 ? n.toLocaleString('en-IN') : n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+        }
+
+        function renderResults(data) {
+          var list = data.top_results || [];
+          var total = data.total_found != null ? data.total_found : 0;
+          var q = data.query || '';
+          var isSampleFallback = data.sample_fallback === true;
+
+          if (list.length === 0 && !isSampleFallback) {
+            showMessage('No products found for "' + escapeHtml(q) + '". Sites may be blocking automated access. Try <strong>Try demo</strong> or different keywords.');
+            return;
+          }
+
+          var html = '';
+          if (isSampleFallback) {
+            html += '<p class="message" style="margin-bottom:1rem">No live results for "' + escapeHtml(q) + '". Links below open the same search on each site — check there for real prices.</p>';
+          }
+          html += '<div class="results-header">';
+          html += '<span>' + (isSampleFallback ? 'Search on' : 'Top ' + list.length + ' by price (low → high)') + '</span>';
+          html += '<span>' + (total > 0 ? total + ' product(s) found' : 'Click to search on site') + '</span>';
+          html += '</div><div class="results-list">';
+
+          for (var i = 0; i < list.length; i++) {
+            var item = list[i];
+            var title = (item.title || '').trim() || 'Untitled';
+            var price = item.price;
+            var platform = (item.platform || '').trim() || '—';
+            var url = (item.url || '').trim() || '#';
+            var rating = item.rating != null && item.rating !== '' ? '⭐ ' + item.rating : '';
+
+            html += '<a class="card" href="' + escapeHtml(url) + '" target="_blank" rel="noopener">';
+            html += '<span class="rank">' + (i + 1) + '</span>';
+            html += '<div class="card-body">';
+            html += '<div class="card-title">' + escapeHtml(title) + '</div>';
+            html += '<div class="card-meta">';
+            html += '<span class="platform">' + escapeHtml(platform) + '</span>';
+            if (rating) html += '<span>' + escapeHtml(rating) + '</span>';
+            html += '</div></div>';
+            html += '<div class="card-price">' + formatPrice(price) + ' <small>best</small></div>';
+            html += '</a>';
+          }
+
+          html += '</div>';
+          out.innerHTML = html;
+        }
+
+        function showLoading() {
+          out.innerHTML = '<div class="loading"><div class="spinner"></div><p>Searching across stores…</p><p style="font-size:0.85rem;margin-top:0.5rem">This can take 3–6 minutes. Please wait — do not refresh.</p></div>';
+        }
+
+        function doSearch(useDemo) {
+          var q = (queryInput.value || '').trim() || 'sample product';
+          if (!useDemo && !(queryInput.value || '').trim()) {
+            showMessage('Please enter a product name.', true);
+            return;
+          }
+
+          setLoading(true);
+          showLoading();
+
+          var controller = new AbortController();
+          var timeoutMs = useDemo ? 5000 : 360000;
+          var timeoutId = setTimeout(function() { controller.abort(); }, timeoutMs);
+
+          fetch('/api/search', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query: q, max: 5, demo: !!useDemo }),
+            signal: controller.signal
+          }).then(function(res) {
+            clearTimeout(timeoutId);
+            return res.text().then(function(text) {
+              var data = {};
+              try { data = JSON.parse(text); } catch (_) {}
+              if (!res.ok) {
+                showMessage((data.error || 'Search failed.') + ' Check terminal for details.', true);
+                return;
+              }
+              renderResults(data);
+            });
+          }).catch(function(err) {
+            clearTimeout(timeoutId);
+            if (err.name === 'AbortError') {
+              showMessage('Request timed out (6 min). Scraping can take 3–6 min. Try again or check terminal.', true);
+            } else {
+              showMessage('Cannot reach server. Run python app.py and open http://localhost:5000', true);
+            }
+          }).then(function() {
+            setLoading(false);
+          }).catch(function() {
+            setLoading(false);
+          });
+        }
+
+        submitBtn.addEventListener('click', function() { doSearch(false); });
+        if (demoBtn) demoBtn.addEventListener('click', function() { doSearch(true); });
+        queryInput.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter') { e.preventDefault(); doSearch(false); }
+        });
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+      } else {
+        init();
+      }
+    })();
+  </script>
+</body>
+</html>

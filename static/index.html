@@ -296,159 +296,78 @@
     </footer>
   </div>
 
-  <script>
-    (function() {
-      'use strict';
-      var out, queryInput, submitBtn, demoBtn;
+<script>
+document.addEventListener("DOMContentLoaded", function () {
 
-      function init() {
-        out = document.getElementById('out');
-        queryInput = document.getElementById('query');
-        submitBtn = document.getElementById('submitBtn');
-        demoBtn = document.getElementById('demoBtn');
-        if (!out || !queryInput || !submitBtn) {
-          if (out) out.innerHTML = '<p class="message error">Page failed to load. Hard refresh: Ctrl+Shift+R</p>';
-          return;
-        }
+  const out = document.getElementById('out');
+  const queryInput = document.getElementById('query');
+  const submitBtn = document.getElementById('submitBtn');
+  const demoBtn = document.getElementById('demoBtn');
 
-        // Check if server is reachable
-        fetch('/api/health', { method: 'GET' }).catch(function() {
-          var msg = document.getElementById('initialMsg');
-          if (msg) msg.innerHTML = '⚠️ Server not detected. Run <strong>python app.py</strong> and open <strong>http://localhost:5000</strong>';
-        });
+  function showMessage(msg, err=false){
+    out.innerHTML = `<p class="message ${err?'error':''}">${msg}</p>`;
+  }
 
-        function setLoading(loading) {
-          submitBtn.disabled = loading;
-          submitBtn.textContent = loading ? 'Searching…' : 'Search';
-          if (demoBtn) {
-            demoBtn.disabled = loading;
-            demoBtn.textContent = loading ? '…' : 'Try demo';
-          }
-        }
+  function formatPrice(p){
+    if(!p || Number(p)<=0) return "Price N/A";
+    return "₹"+Number(p).toLocaleString("en-IN");
+  }
 
-        function showMessage(text, isError) {
-          isError = !!isError;
-          out.innerHTML = '<p class="message' + (isError ? ' error' : '') + '">' + escapeHtml(text) + '</p>';
-        }
+  function renderResults(data){
+    const list = data.top_results || [];
+    if(!list.length){
+      showMessage("No results found");
+      return;
+    }
 
-        function escapeHtml(s) {
-          var div = document.createElement('div');
-          div.textContent = s == null ? '' : String(s);
-          return div.innerHTML;
-        }
+    let html = `<div class="results-header">
+      <span>Top ${list.length} results</span>
+      <span>${data.total_found||0} found</span>
+    </div><div class="results-list">`;
 
-        function formatPrice(price) {
-          if (price == null || Number.isNaN(Number(price))) return 'Price N/A';
-          var n = Number(price);
-          if (n <= 0) return 'Price N/A';
-          return '₹' + (n % 1 === 0 ? n.toLocaleString('en-IN') : n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
-        }
+    list.forEach((item,i)=>{
+      html += `
+      <a class="card" href="${item.url}" target="_blank">
+        <span class="rank">${i+1}</span>
+        <div class="card-body">
+          <div class="card-title">${item.title||"Untitled"}</div>
+          <div class="card-meta">
+            <span class="platform">${item.platform||"-"}</span>
+            ${item.rating?`<span>⭐ ${item.rating}</span>`:""}
+          </div>
+        </div>
+        <div class="card-price">${formatPrice(item.price)}</div>
+      </a>`;
+    });
 
-        function renderResults(data) {
-          var list = data.top_results || [];
-          var total = data.total_found != null ? data.total_found : 0;
-          var q = data.query || '';
-          var isSampleFallback = data.sample_fallback === true;
+    html += "</div>";
+    out.innerHTML = html;
+  }
 
-          if (list.length === 0 && !isSampleFallback) {
-            showMessage('No products found for "' + escapeHtml(q) + '". Sites may be blocking automated access. Try <strong>Try demo</strong> or different keywords.');
-            return;
-          }
+  function doSearch(useDemo=false){
+    const q = queryInput.value.trim() || "sample";
+    showMessage("Searching... please wait");
 
-          var html = '';
-          if (isSampleFallback) {
-            html += '<p class="message" style="margin-bottom:1rem">No live results for "' + escapeHtml(q) + '". Links below open the same search on each site — check there for real prices.</p>';
-          }
-          html += '<div class="results-header">';
-          html += '<span>' + (isSampleFallback ? 'Search on' : 'Top ' + list.length + ' by price (low → high)') + '</span>';
-          html += '<span>' + (total > 0 ? total + ' product(s) found' : 'Click to search on site') + '</span>';
-          html += '</div><div class="results-list">';
+    fetch("/api/search", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({query: q, demo: useDemo})
+    })
+    .then(res => res.json())
+    .then(data => {
+      console.log("API:", data);
+      renderResults(data);
+    })
+    .catch(err => {
+      console.error(err);
+      showMessage("Cannot connect to server.", true);
+    });
+  }
 
-          for (var i = 0; i < list.length; i++) {
-            var item = list[i];
-            var title = (item.title || '').trim() || 'Untitled';
-            var price = item.price;
-            var platform = (item.platform || '').trim() || '—';
-            var url = (item.url || '').trim() || '#';
-            var rating = item.rating != null && item.rating !== '' ? '⭐ ' + item.rating : '';
+  submitBtn.onclick = ()=>doSearch(false);
+  demoBtn.onclick = ()=>doSearch(true);
 
-            html += '<a class="card" href="' + escapeHtml(url) + '" target="_blank" rel="noopener">';
-            html += '<span class="rank">' + (i + 1) + '</span>';
-            html += '<div class="card-body">';
-            html += '<div class="card-title">' + escapeHtml(title) + '</div>';
-            html += '<div class="card-meta">';
-            html += '<span class="platform">' + escapeHtml(platform) + '</span>';
-            if (rating) html += '<span>' + escapeHtml(rating) + '</span>';
-            html += '</div></div>';
-            html += '<div class="card-price">' + formatPrice(price) + ' <small>best</small></div>';
-            html += '</a>';
-          }
-
-          html += '</div>';
-          out.innerHTML = html;
-        }
-
-        function showLoading() {
-          out.innerHTML = '<div class="loading"><div class="spinner"></div><p>Searching across stores…</p><p style="font-size:0.85rem;margin-top:0.5rem">This can take 3–6 minutes. Please wait — do not refresh.</p></div>';
-        }
-
-        function doSearch(useDemo) {
-          var q = (queryInput.value || '').trim() || 'sample product';
-          if (!useDemo && !(queryInput.value || '').trim()) {
-            showMessage('Please enter a product name.', true);
-            return;
-          }
-
-          setLoading(true);
-          showLoading();
-
-          var controller = new AbortController();
-          var timeoutMs = useDemo ? 5000 : 360000;
-          var timeoutId = setTimeout(function() { controller.abort(); }, timeoutMs);
-
-          fetch('/api/search', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ query: q, max: 5, demo: !!useDemo }),
-            signal: controller.signal
-          }).then(function(res) {
-            clearTimeout(timeoutId);
-            return res.text().then(function(text) {
-              var data = {};
-              try { data = JSON.parse(text); } catch (_) {}
-              if (!res.ok) {
-                showMessage((data.error || 'Search failed.') + ' Check terminal for details.', true);
-                return;
-              }
-              renderResults(data);
-            });
-          }).catch(function(err) {
-            clearTimeout(timeoutId);
-            if (err.name === 'AbortError') {
-              showMessage('Request timed out (6 min). Scraping can take 3–6 min. Try again or check terminal.', true);
-            } else {
-              showMessage('Cannot reach server. Run python app.py and open http://localhost:5000', true);
-            }
-          }).then(function() {
-            setLoading(false);
-          }).catch(function() {
-            setLoading(false);
-          });
-        }
-
-        submitBtn.addEventListener('click', function() { doSearch(false); });
-        if (demoBtn) demoBtn.addEventListener('click', function() { doSearch(true); });
-        queryInput.addEventListener('keydown', function(e) {
-          if (e.key === 'Enter') { e.preventDefault(); doSearch(false); }
-        });
-      }
-
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', init);
-      } else {
-        init();
-      }
-    })();
-  </script>
+});
+</script>
 </body>
 </html>

@@ -10,10 +10,10 @@
       "base_url": "https://www.flipkart.com",
       "search_url": "https://www.flipkart.com/search?q="
     },
-    "ebay": {
+    "myntra": {
       "enabled": true,
-      "base_url": "https://www.ebay.com",
-      "search_url": "https://www.ebay.com/sch/i.html?_nkw="
+      "base_url": "https://www.myntra.com",
+      "search_url": "https://www.myntra.com/"
     },
     "croma": {
       "enabled": true,

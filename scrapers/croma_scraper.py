@@ -2,6 +2,7 @@
 Croma scraper implementation
 """
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from typing import List, Dict
@@ -20,168 +21,98 @@ class CromaScraper(BaseScraper):
         self.logger = logging.getLogger('ShopEasy')
     
     def search_product(self, product_name: str, max_results: int = 5) -> List[Dict]:
-        """Search for product on Croma"""
+        """Search for product on Croma using automated typing"""
         results = []
         try:
-            search_url = f"{self.base_url}/search/?q={product_name.replace(' ', '%20')}"
-            self.logger.debug(f"Loading Croma URL: {search_url}")
-            self.driver.get(search_url)
+            self.logger.info(f"Navigating to Croma homepage...")
+            self.driver.get(self.base_url)
             
-            # Wait for products to load
+            # 1. Wait for the search box to be visible and interactable
+            wait = WebDriverWait(self.driver, self.timeout)
             try:
-                WebDriverWait(self.driver, self.timeout).until(
-                    EC.presence_of_element_located((By.CSS_SELECTOR, '.cp-product, .product-item, [data-product-id]'))
-                )
+                # Croma's search ID is typically 'searchV2' or 'search'
+                search_box = wait.until(EC.element_to_be_clickable((By.ID, "searchV2")))
             except:
-                self.logger.warning("Timeout waiting for Croma search results")
+                # Fallback to general search input if ID changed
+                search_box = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "input[type='search'], #search")))
+
+            # 2. Automate the typing and searching
+            self.logger.debug(f"Typing product name: {product_name}")
+            search_box.clear()
+            search_box.send_keys(product_name)
+            search_box.send_keys(Keys.ENTER)
             
-            time.sleep(2)  # Additional wait for dynamic content
+            # 3. Wait for the results page to load
+            # We look for the product list container
+            try:
+                wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, '.cp-product, .product-item, .plp-card-main')))
+            except:
+                self.logger.warning("Timeout waiting for Croma results to appear")
+
+            time.sleep(3)  # Extra buffer for images and prices to render
             
-            # Try multiple selectors for product containers
+            # --- START SCRAPING LOGIC ---
+            
             product_elements = []
             selectors = [
-                'div.cp-product',
-                '.product-item',
-                '[data-product-id]',
-                '.cp-product-tile',
-                'div[class*="product"]'
+                'div.cp-product', 
+                '.product-item', 
+                '.plp-card-main',
+                '[data-product-id]'
             ]
             
             for selector in selectors:
-                try:
-                    product_elements = self.driver.find_elements(By.CSS_SELECTOR, selector)
-                    if product_elements:
-                        self.logger.debug(f"Found {len(product_elements)} products using selector: {selector}")
-                        break
-                except:
-                    continue
+                product_elements = self.driver.find_elements(By.CSS_SELECTOR, selector)
+                if product_elements:
+                    self.logger.debug(f"Found {len(product_elements)} products using: {selector}")
+                    break
             
             if not product_elements:
-                self.logger.warning("No product elements found on Croma")
                 return results
             
-            product_elements = product_elements[:max_results]
-            
-            for idx, element in enumerate(product_elements):
+            for idx, element in enumerate(product_elements[:max_results]):
                 try:
-                    # Extract title - try multiple selectors
-                    title = None
-                    title_selectors = [
-                        'h3.product-title a',
-                        '.cp-product-title a',
-                        'a[data-product-title]',
-                        'h3 a',
-                        '.product-title',
-                        'a[href*="/product/"]'
-                    ]
-                    
-                    for title_sel in title_selectors:
+                    # Extract Title
+                    title = "N/A"
+                    title_selectors = ['h3.product-title', '.plp-product-title', '.cp-product-title', 'h3']
+                    for t_sel in title_selectors:
                         try:
-                            title_elem = element.find_element(By.CSS_SELECTOR, title_sel)
-                            title = title_elem.text.strip() or title_elem.get_attribute('title')
-                            if title:
-                                break
-                        except:
-                            continue
-                    
-                    if not title:
-                        # Try getting from any link
-                        try:
-                            link_elem = element.find_element(By.CSS_SELECTOR, 'a[href*="/product/"]')
-                            title = link_elem.get_attribute('title') or link_elem.text.strip()
-                        except:
-                            pass
-                    
-                    if not title:
-                        self.logger.debug(f"Could not extract title for product {idx+1}")
-                        continue
-                    
-                    # Extract URL
-                    url = None
-                    try:
-                        link_elem = element.find_element(By.CSS_SELECTOR, 'h3.product-title a, .cp-product-title a, a[href*="/product/"]')
-                        url = link_elem.get_attribute('href')
-                        if url and not url.startswith('http'):
-                            url = self.base_url + url
-                    except:
-                        pass
-                    
-                    if not url:
-                        url = self.base_url
-                    
-                    # Extract price - try multiple selectors
+                            title_elem = element.find_element(By.CSS_SELECTOR, t_sel)
+                            title = title_elem.text.strip()
+                            if title: break
+                        except: continue
+
+                    # Extract Price
                     price = 0.0
-                    price_selectors = [
-                        '.amount',
-                        '.product-price',
-                        '.cp-product-price',
-                        '[data-price]',
-                        '.price',
-                        'span[class*="price"]'
-                    ]
-                    
-                    for price_sel in price_selectors:
+                    price_selectors = ['.amount', '.new-price', '.cp-price', '.pdp-price']
+                    for p_sel in price_selectors:
                         try:
-                            price_elem = element.find_element(By.CSS_SELECTOR, price_sel)
-                            price_text = price_elem.text or price_elem.get_attribute('data-price')
-                            if price_text:
-                                price = self.extract_price(price_text)
-                                if price > 0:
-                                    break
-                        except:
-                            continue
-                    
-                    # If still no price, try to find any price-like text
-                    if price == 0:
-                        try:
-                            all_text = element.text
-                            import re
-                            price_matches = re.findall(r'[₹]?\s*(\d{1,3}(?:[,\s]\d{3})*(?:\.\d{2})?)', all_text)
-                            if price_matches:
-                                price = self.extract_price(price_matches[0])
-                        except:
-                            pass
-                    
-                    # Extract rating
-                    rating = None
+                            price_text = element.find_element(By.CSS_SELECTOR, p_sel).text
+                            price = self.extract_price(price_text)
+                            if price > 0: break
+                        except: continue
+
+                    # Extract URL
+                    url = self.base_url
                     try:
-                        rating_selectors = [
-                            '.rating',
-                            '.product-rating',
-                            '[data-rating]',
-                            '.cp-rating'
-                        ]
-                        for rating_sel in rating_selectors:
-                            try:
-                                rating_elem = element.find_element(By.CSS_SELECTOR, rating_sel)
-                                rating_text = rating_elem.get_attribute('data-rating') or rating_elem.text
-                                if rating_text:
-                                    rating = float(rating_text)
-                                    break
-                            except:
-                                continue
-                    except:
-                        pass
-                    
-                    # Add product even if price is 0 (for debugging)
-                    if title:
-                        product_data = {
-                            'title': title[:200],
+                        url = element.find_element(By.TAG_NAME, 'a').get_attribute('href')
+                    except: pass
+
+                    if title != "N/A":
+                        results.append({
+                            'title': title,
                             'price': price,
                             'url': url,
                             'platform': self.platform,
-                            'rating': rating
-                        }
-                        results.append(product_data)
-                        self.logger.debug(f"Extracted: {title[:50]}... - ₹{price}")
-                    
+                            'rating': None # Croma ratings are often lazily loaded via JS
+                        })
+
                 except Exception as e:
-                    self.logger.debug(f"Error extracting product {idx+1}: {str(e)}")
                     continue
-            
-            self.logger.info(f"Successfully extracted {len(results)} products from Croma")
+
+            self.logger.info(f"Croma: Extracted {len(results)} items")
             
         except Exception as e:
-            self.logger.error(f"Error scraping Croma: {str(e)}", exc_info=True)
+            self.logger.error(f"Croma Error: {str(e)}")
         
         return results

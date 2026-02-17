@@ -1,6 +1,6 @@
 """
 ShopEasy - Automated Price Comparison Tool
-Main application orchestrator
+Main application orchestrator (Updated for Myntra & Amazon Fix)
 """
 import json
 import argparse
@@ -10,11 +10,12 @@ from utils.logger import setup_logger
 from utils.data_analyzer import DataAnalyzer
 from utils.email_notifier import EmailNotifier
 from utils.recommendation_system import RecommendationSystem
+
+# Import Scrapers
 from scrapers.amazon_scraper import AmazonScraper
 from scrapers.flipkart_scraper import FlipkartScraper
-from scrapers.ebay_scraper import EbayScraper
+from scrapers.myntra_scraper import MyntraScraper  # Added Myntra
 from scrapers.croma_scraper import CromaScraper
-
 
 class ShopEasy:
     """Main ShopEasy application"""
@@ -60,10 +61,11 @@ class ShopEasy:
         headless = settings.get('headless', False)
         timeout = settings.get('timeout', 30)
         
+        # Updated: Replaced 'ebay' with 'myntra'
         scraper_classes = {
             'amazon': AmazonScraper,
             'flipkart': FlipkartScraper,
-            'ebay': EbayScraper,
+            'myntra': MyntraScraper,
             'croma': CromaScraper
         }
         
@@ -86,7 +88,6 @@ class ShopEasy:
         all_results = []
         
         self.logger.info(f"🔍 Searching for: {product_name}")
-        self.logger.info(f"📊 Max results per site: {max_results}")
         
         for scraper in self.scrapers:
             try:
@@ -96,13 +97,13 @@ class ShopEasy:
                 self.logger.info(f"✓ Found {len(results)} products on {scraper.platform}")
             except Exception as e:
                 self.logger.error(f"✗ Error scraping {scraper.platform}: {str(e)}")
-            finally:
-                scraper.close()
+            # Note: We do NOT close the scraper here if we want to keep the session alive, 
+            # but usually, we close at the very end of the app lifecycle.
         
         return all_results
     
     def compare_prices(self, product_name: str, threshold_price: float = None, 
-                      send_email: bool = False, recipient: str = None):
+                       send_email: bool = False, recipient: str = None):
         """Main method to compare prices"""
         self.logger.info("=" * 60)
         self.logger.info("🚀 ShopEasy - Starting Price Comparison")
@@ -112,53 +113,27 @@ class ShopEasy:
         all_results = self.search_product(product_name)
         
         if not all_results:
-            self.logger.warning("⚠️  No products found! This could mean:")
-            self.logger.warning("   1. The websites have changed their HTML structure")
-            self.logger.warning("   2. The scrapers need to be updated")
-            self.logger.warning("   3. Network/access issues")
-            self.logger.warning("   4. Try running with headless=False in config.json to see what's happening")
+            self.logger.warning("⚠️  No products found! Try checking your internet or updating selectors.")
             return
         
-        # Log products found (including those without prices for debugging)
-        products_with_price = len([r for r in all_results if r.get('price', 0) > 0])
-        products_without_price = len(all_results) - products_with_price
-        if products_without_price > 0:
-            self.logger.warning(f"⚠️  Found {products_without_price} products without prices (may need selector updates)")
-        
-        # Analyze data
+        # Analysis
         self.logger.info("\n📈 Analyzing results...")
         df = self.data_analyzer.create_dataframe(all_results)
         analysis = self.data_analyzer.analyze_prices(df)
         
-        # Generate report
+        # Generate and print report
         report = self.data_analyzer.get_summary_report(df)
         print("\n" + report)
-        self.logger.info("\n" + report)
         
-        # Check for price drop
+        # Price Drop Logic
         if threshold_price and analysis.get('cheapest'):
             best_price = analysis['cheapest']['price']
             if best_price <= threshold_price:
                 self.logger.info(f"🎉 Price below threshold! (₹{best_price:.2f} <= ₹{threshold_price:.2f})")
-                
                 if send_email and recipient:
-                    if self.email_notifier.is_configured():
-                        self.email_notifier.send_price_alert(
-                            recipient, product_name, analysis['cheapest'], threshold_price
-                        )
-                    else:
-                        self.logger.warning("Email not configured. Skipping price alert email.")
-            else:
-                self.logger.info(f"ℹ️  Best price (₹{best_price:.2f}) is above threshold (₹{threshold_price:.2f})")
+                    self.email_notifier.send_price_alert(recipient, product_name, analysis['cheapest'], threshold_price)
         
-        # Send email report if requested
-        if send_email and recipient:
-            if self.email_notifier.is_configured():
-                self.email_notifier.send_comparison_report(recipient, product_name, report, analysis)
-            else:
-                self.logger.warning("Email not configured. Skipping comparison report email.")
-        
-        # Platform comparison
+        # Platform Stats
         self.logger.info("\n📊 Platform Comparison:")
         platform_stats = self.data_analyzer.compare_platforms(df)
         print("\n" + platform_stats.to_string())
@@ -173,7 +148,6 @@ class ShopEasy:
             except:
                 pass
 
-
 def main():
     """Main entry point"""
     parser = argparse.ArgumentParser(description='ShopEasy - Automated Price Comparison Tool')
@@ -181,16 +155,13 @@ def main():
     parser.add_argument('--threshold', type=float, help='Price threshold for alerts')
     parser.add_argument('--email', help='Email address to send notifications')
     parser.add_argument('--config', default='config.json', help='Path to config file')
-    parser.add_argument('--max-results', type=int, help='Max results per site')
     parser.add_argument('--debug', action='store_true', help='Enable debug logging')
     
     args = parser.parse_args()
     
-    # Set logging level
     if args.debug:
         import logging
         logging.getLogger('ShopEasy').setLevel(logging.DEBUG)
-        logging.getLogger('selenium').setLevel(logging.WARNING)  # Reduce Selenium noise
     
     app = ShopEasy(config_path=args.config)
     
@@ -202,13 +173,9 @@ def main():
             recipient=args.email
         )
     except KeyboardInterrupt:
-        app.logger.info("\n⚠️  Interrupted by user")
-    except Exception as e:
-        app.logger.error(f"❌ Error: {str(e)}")
-        sys.exit(1)
+        print("\n⚠️ Interrupted by user")
     finally:
         app.cleanup()
-
 
 if __name__ == '__main__':
     main()

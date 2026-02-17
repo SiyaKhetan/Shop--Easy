@@ -1,5 +1,5 @@
 """
-Amazon scraper implementation - Fixed Stealth Version with Correct Link Extraction
+Amazon scraper implementation - Ultimate Link Extraction Fix
 """
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -12,7 +12,7 @@ import random
 from .base_scraper import BaseScraper
 
 class AmazonScraper(BaseScraper):
-    """Scraper for Amazon.in with improved accuracy and Anti-Bot bypass"""
+    """Scraper for Amazon.in with robust URL extraction and Anti-Bot bypass"""
     
     def __init__(self, headless: bool = False, timeout: int = 30):
         super().__init__(headless, timeout)
@@ -33,19 +33,18 @@ class AmazonScraper(BaseScraper):
         })
 
     def _wait_for_page_load(self):
-        """Wait for page to fully load with human-like randomized delays"""
+        """Wait for page to fully load"""
         try:
             WebDriverWait(self.driver, self.timeout).until(
                 EC.presence_of_element_located((By.CSS_SELECTOR, 'div[data-component-type="s-search-result"], .s-result-item'))
             )
-            time.sleep(random.uniform(2.0, 4.0)) 
+            time.sleep(random.uniform(2.0, 4.0))
             self.driver.execute_script("window.scrollTo(0, 400);")
-            time.sleep(1)
         except Exception as e:
             self.logger.debug(f"Page load wait timed out: {str(e)}")
 
     def _is_valid_product(self, element) -> bool:
-        """Check if element is a valid product (not ad/sponsored)"""
+        """Check if element is a valid product"""
         try:
             is_sponsored = element.find_elements(By.XPATH, ".//span[contains(text(), 'Sponsored')]") or \
                            element.find_elements(By.XPATH, ".//span[contains(text(), 'Ad')]")
@@ -74,55 +73,63 @@ class AmazonScraper(BaseScraper):
             return 0.0
 
     def _extract_url(self, element) -> str:
-        """Robustly extract and clean the product URL"""
+        """Overhauled URL extraction to ensure valid product links"""
+        url = None
         try:
-            # Look for the primary link in the heading
-            link_elem = element.find_element(By.CSS_SELECTOR, 'h2 a')
-            url = link_elem.get_attribute('href')
-            
-            # If the primary link is missing or invalid, find any product link within the item
-            if not url or '/dp/' not in url:
-                potential_links = element.find_elements(By.CSS_SELECTOR, 'a[href*="/dp/"], a[href*="/gp/product/"]')
-                if potential_links:
-                    url = potential_links[0].get_attribute('href')
+            # 1. Try the main heading link (standard Amazon structure)
+            link_selectors = ['h2 a', 'a.a-link-normal.s-underline-text', 'a.a-link-normal']
+            for selector in link_selectors:
+                try:
+                    found_link = element.find_element(By.CSS_SELECTOR, selector)
+                    url = found_link.get_attribute('href')
+                    if url and '/dp/' in url: break
+                except: continue
 
+            # 2. Fallback: Search the entire product element for any link containing /dp/
+            if not url or '/dp/' not in url:
+                all_links = element.find_elements(By.TAG_NAME, 'a')
+                for l in all_links:
+                    potential_url = l.get_attribute('href')
+                    if potential_url and '/dp/' in potential_url:
+                        url = potential_url
+                        break
+
+            # 3. Final Fallback: Use the ASIN to build a direct URL
+            if not url or '/dp/' not in url:
+                asin = element.get_attribute('data-asin')
+                if asin:
+                    url = f"{self.base_url}/dp/{asin}"
+
+            # Clean tracking parameters
             if url:
-                # Clean URL: Extract the base product path and remove tracking/search parameters
-                # This ensures the link is short and direct
                 clean_match = re.search(r'(https?://[^/]+(?:/dp/|/gp/product/)[A-Z0-9]+)', url)
-                if clean_match:
-                    return clean_match.group(1)
-                return url.split('?')[0]
-        except:
-            pass
+                return clean_match.group(1) if clean_match else url.split('?')[0]
+                
+        except Exception as e:
+            self.logger.debug(f"URL Extraction Error: {e}")
         return self.base_url
 
     def search_product(self, product_name: str, max_results: int = 5) -> List[Dict]:
-        """Search for product on Amazon with improved accuracy"""
         results = []
         try:
             self._apply_stealth_settings()
             search_url = f"{self.base_url}/s?k={product_name.replace(' ', '+')}"
-            self.logger.info(f"Searching Amazon for: {product_name}")
             self.driver.get(search_url)
             
-            if "captcha" in self.driver.page_source.lower() or "robot" in self.driver.title.lower():
-                self.logger.error("Amazon blocked the request with a CAPTCHA.")
+            if "captcha" in self.driver.page_source.lower():
+                self.logger.error("Blocked by CAPTCHA")
                 return []
 
             self._wait_for_page_load()
             product_elements = self.driver.find_elements(By.CSS_SELECTOR, 'div[data-component-type="s-search-result"]')
             
             for element in product_elements:
-                if len(results) >= max_results:
-                    break
-                
-                if not self._is_valid_product(element):
-                    continue
+                if len(results) >= max_results: break
+                if not self._is_valid_product(element): continue
 
                 title = self._extract_title(element)
                 price = self._extract_price(element)
-                url = self._extract_url(element) # Using the new robust method
+                url = self._extract_url(element) # Overhauled method
 
                 if title and price > 0:
                     results.append({
@@ -133,9 +140,6 @@ class AmazonScraper(BaseScraper):
                         'rating': None,
                         'num_reviews': None
                     })
-
-            self.logger.info(f"Extracted {len(results)} products from Amazon")
         except Exception as e:
-            self.logger.error(f"Error scraping Amazon: {str(e)}")
-        
+            self.logger.error(f"Scraper error: {str(e)}")
         return results

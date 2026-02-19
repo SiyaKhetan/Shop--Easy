@@ -168,5 +168,7 @@ def health():
     return jsonify({'status': 'ok', 'service': 'ShopEasy'})
 
 
+
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    # Use threaded=True to handle scraper and chatbot requests simultaneously
+    app.run(host='0.0.0.0', port=5000, debug=True, threaded=True)

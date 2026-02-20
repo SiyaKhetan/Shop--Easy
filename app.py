@@ -5,17 +5,19 @@ Flask API + frontend for price comparison.
 import os
 import sys
 import math
+from flask import Flask, request, jsonify, render_template
+from flask_cors import CORS 
+from utils.logger import setup_logger
+from main import ShopEasy
 
 # Run from project root so config and imports work
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 os.chdir(PROJECT_ROOT)
 sys.path.insert(0, PROJECT_ROOT)
 
-from flask import Flask, request, jsonify, send_from_directory
-from utils.logger import setup_logger
-from main import ShopEasy
-
-app = Flask(__name__, static_folder='static', static_url_path='')
+# Initialize Flask to look at the 'templates' folder you created
+app = Flask(__name__, template_folder='templates')
+CORS(app)
 logger = setup_logger('ShopEasy')
 
 
@@ -92,11 +94,9 @@ def get_top_results(product_name: str, max_results: int = 5):
 
 @app.route('/')
 def index():
-    """Serve the main frontend page."""
-    r = send_from_directory(app.static_folder, 'index.html')
-    r.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate'
-    r.headers['Pragma'] = 'no-cache'
-    return r
+    """Serve the main frontend page from the templates folder."""
+    # render_template automatically looks inside the 'templates' folder
+    return render_template('index.html')
 
 
 @app.route('/api/search', methods=['GET', 'POST'])
@@ -114,7 +114,6 @@ def search():
         return jsonify({'error': 'Missing search query'}), 400
 
     try:
-        # Fetch max results from query params or JSON body
         json_data = request.get_json(silent=True) or {}
         max_results = int(request.args.get('max') or json_data.get('max', 5))
     except (TypeError, ValueError):
@@ -168,7 +167,6 @@ def health():
     return jsonify({'status': 'ok', 'service': 'ShopEasy'})
 
 
-
 if __name__ == '__main__':
-    # Use threaded=True to handle scraper and chatbot requests simultaneously
+    # threaded=True handles multiple requests simultaneously
     app.run(host='0.0.0.0', port=5000, debug=True, threaded=True)

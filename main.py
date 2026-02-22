@@ -14,7 +14,7 @@ from utils.recommendation_system import RecommendationSystem
 # Import Scrapers
 from scrapers.amazon_scraper import AmazonScraper
 from scrapers.flipkart_scraper import FlipkartScraper
-from scrapers.myntra_scraper import MyntraScraper  # Added Myntra
+
 from scrapers.croma_scraper import CromaScraper
 
 class ShopEasy:
@@ -65,7 +65,7 @@ class ShopEasy:
         scraper_classes = {
             'amazon': AmazonScraper,
             'flipkart': FlipkartScraper,
-            'myntra': MyntraScraper,
+           
             'croma': CromaScraper
         }
         

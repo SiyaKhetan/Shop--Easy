@@ -10,11 +10,7 @@
       "base_url": "https://www.flipkart.com",
       "search_url": "https://www.flipkart.com/search?q="
     },
-    "myntra": {
-      "enabled": true,
-      "base_url": "https://www.myntra.com",
-      "search_url": "https://www.myntra.com/"
-    },
+    
     "croma": {
       "enabled": true,
       "base_url": "https://www.croma.com",
